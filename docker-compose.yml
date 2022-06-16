@@ -1,0 +1,61 @@
+version: "3.9"
+
+services:
+  database:
+    container_name: ${NAME}-db
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - "mysqldata:/var/lib/mysql"
+      - "./.docker/data/my.cnf:/etc/mysql/conf.d/my.cnf"
+    ports:
+      - 3306:3306
+    restart: unless-stopped
+
+  nginx:
+    container_name: ${NAME}-nginx
+    image: nginx:1.21-alpine
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./public:${WEBSERVER_ROOT}
+      - ./.docker/web/templates:/etc/nginx/templates
+      - ./.docker/web/certs:/etc/certs
+    depends_on:
+      - php
+    env_file:
+      - .env
+
+  php:
+    container_name: ${NAME}-php
+    build: ./.docker/php
+    working_dir: /opt/app/src/
+    volumes:
+      - ./public:${WEBSERVER_ROOT}
+      - "./.env:/var/www/shared/.env"
+      - ./:/opt/app/src/
+      - ./.docker/php/conf/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+    depends_on:
+      - database
+
+  wp-cli:
+    image: wordpress:cli
+    working_dir: ${WEBSERVER_ROOT}
+    volumes:
+      - ./public:${WEBSERVER_ROOT}
+    environment:
+      WORDPRESS_DB_HOST: database
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}=value
+    depends_on:
+      - database
+
+
+volumes:
+  mysqldata: {}
